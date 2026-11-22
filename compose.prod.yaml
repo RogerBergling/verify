@@ -6,14 +6,16 @@ services:
     image: ghcr.io/rogerbergling/verify:latest
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      # Loopback only. The auth proxy must be the only route to the app.
+      - "127.0.0.1:8080:8080"
     environment:
       # First-visit theme: dark, light or system. A saved toggle choice wins.
       APP_THEME: ${APP_THEME:-dark}
       AUTH_MODE: proxy
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       PN_ENCRYPTION_KEY: ${PN_ENCRYPTION_KEY:-}
-      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:-}
+      # Required: without it, anyone who can reach the app can forge identity headers.
+      PROXY_SHARED_SECRET: ${PROXY_SHARED_SECRET:?set PROXY_SHARED_SECRET in .env}
       COOKIE_SECURE: "1"
       BASE_URL: ${BASE_URL:?set BASE_URL in .env}
       PROXY_LOGOUT_URL: ${PROXY_LOGOUT_URL:-}

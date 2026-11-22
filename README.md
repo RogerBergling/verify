@@ -84,7 +84,7 @@ The app expects the reverse proxy / IdP to authenticate the user and inject:
 | `X-Person-Id` | No | Swedish personal number or comparable ID. Sensitive; stored encrypted. |
 | `X-Auth-Assurance` | No | `proxy`, `eid_auth`, or `eid_sign`. Defaults to `proxy`. |
 | `X-Auth-Org` | No | Organisation/company label for customer-service flows. |
-| `X-Proxy-Secret` | Optional | Shared secret between proxy and app when `PROXY_SHARED_SECRET` is set. |
+| `X-Proxy-Secret` | Production | Shared secret between proxy and app. Required by `compose.prod.yaml`; optional only for an mTLS-only deployment. |
 
 **The proxy must:**
 
@@ -103,7 +103,7 @@ Production environment example:
 AUTH_MODE=proxy
 SECRET_KEY=<long random secret>
 PN_ENCRYPTION_KEY=<optional separate 32+ char key>
-PROXY_SHARED_SECRET=<optional proxy shared secret>
+PROXY_SHARED_SECRET=<required proxy shared secret in production Compose>
 COOKIE_SECURE=1
 BASE_URL=https://verify.example.se
 ALLOWED_ORIGINS=https://verify.example.se,https://verify-alias.example.se

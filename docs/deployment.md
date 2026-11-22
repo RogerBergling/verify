@@ -51,7 +51,7 @@ to delete the data.
 | `AUTH_MODE` | `proxy` | `proxy` for production, `dev` for local mock identities. |
 | `SECRET_KEY` | required in proxy mode | Session/CSRF/receipt signing material and PN-encryption derivation. At least 32 characters. |
 | `PN_ENCRYPTION_KEY` | derived from `SECRET_KEY` | Optional separate key for personal-number encryption. |
-| `PROXY_SHARED_SECRET` | unset | Optional shared secret required in `X-Proxy-Secret`. |
+| `PROXY_SHARED_SECRET` | required by production Compose | Shared secret required in `X-Proxy-Secret`. Optional only when the proxy-to-app leg uses mTLS. |
 | `COOKIE_SECURE` | true in proxy mode | Adds `Secure` to the session cookie. Set `0` only for local HTTP. |
 | `COOKIE_NAME` | `__Host-verify_sid` when secure, else `verify_sid` | Session cookie name. The `__Host-` prefix requires `Secure`, `Path=/`, and no `Domain`. |
 | `BASE_URL` | required | Public absolute URL used in invitation links, e.g. `https://verify.example.se`. The app refuses to start without it. |
