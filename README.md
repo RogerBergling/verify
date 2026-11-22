@@ -123,6 +123,27 @@ hostname mismatch.
 
 ---
 
+## Theme modes
+
+`APP_THEME` sets the first-visit theme. The theme toggle saves the visitor's
+explicit choice, which overrides this default.
+
+| Value | Behavior |
+|---|---|
+| `dark` | Dark theme (default) |
+| `light` | Light/white theme |
+| `system` | Follow the browser/OS `prefers-color-scheme` |
+
+Set it in `.env` or Compose:
+
+```yaml
+environment:
+  APP_THEME: ${APP_THEME:-dark}
+```
+
+Invalid values fall back to `dark`. The default is rendered into the page and
+resolved before first paint, so there is no theme flash.
+
 ## Full personal number: the decision and the controls
 
 The product decision is that the full personal number **must be displayable** during verification. The implementation treats that as a high-risk feature:

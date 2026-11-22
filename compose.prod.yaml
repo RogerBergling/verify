@@ -8,6 +8,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # First-visit theme: dark, light or system. A saved toggle choice wins.
+      APP_THEME: ${APP_THEME:-dark}
       AUTH_MODE: proxy
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
       PN_ENCRYPTION_KEY: ${PN_ENCRYPTION_KEY:-}

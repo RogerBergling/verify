@@ -39,6 +39,7 @@ class Config:
     allowed_origins: tuple[str, ...] = ()
     app_name: str = "Verify"
     version: str = "0.2.0"
+    app_theme: str = "dark"
     host: str = "0.0.0.0"
     port: int = 8080
     verification_ttl_seconds: int = 600
@@ -116,6 +117,11 @@ class Config:
                     "this machine; set it to the public address in production."
                 )
 
+        app_theme = os.getenv("APP_THEME", "dark").strip().lower()
+        app_theme = {"auto": "system", "white": "light"}.get(app_theme, app_theme)
+        if app_theme not in {"dark", "light", "system"}:
+            app_theme = "dark"
+
         cookie_secure = _env_bool("COOKIE_SECURE", auth_mode == "proxy")
         cookie_name = os.getenv("COOKIE_NAME", "").strip() or (
             "__Host-verify_sid" if cookie_secure else "verify_sid"
@@ -134,6 +140,7 @@ class Config:
             proxy_logout_url=os.getenv("PROXY_LOGOUT_URL", "").strip() or None,
             github_url=os.getenv("GITHUB_URL", "https://github.com/RogerBergling/verify").strip(),
             allowed_origins=allowed_origins,
+            app_theme=app_theme,
             host=os.getenv("HOST", "0.0.0.0").strip(),
             port=_env_int("PORT", 8080),
             verification_ttl_seconds=_env_int("VERIFICATION_TTL_SECONDS", 600),

@@ -685,6 +685,7 @@ def make_handler(config: Config) -> type[BaseHTTPRequestHandler]:
             context.setdefault("is_dev", config.auth_mode == "dev")
             context.setdefault("app_name", config.app_name)
             context.setdefault("version", config.version)
+            context.setdefault("theme_default", config.app_theme)
             context.setdefault("github_url", config.github_url)
             context.setdefault("year", security.utcnow().year)
             context.setdefault("proxy_logout_url", config.proxy_logout_url)

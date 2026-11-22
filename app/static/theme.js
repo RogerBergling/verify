@@ -10,7 +10,18 @@
     // Storage can be disabled; defaults still apply.
   }
 
-  root.dataset.theme = storedTheme === 'light' ? 'light' : 'dark';
+  let theme = storedTheme === 'light' || storedTheme === 'dark' ? storedTheme : null;
+  if (!theme) {
+    const configured = root.dataset.themeDefault;
+    if (configured === 'light' || configured === 'dark') {
+      theme = configured;
+    } else if (configured === 'system') {
+      theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+    } else {
+      theme = 'dark';
+    }
+  }
+  root.dataset.theme = theme;
 
   function updateThemeColor() {
     const meta = document.getElementById('theme-color');

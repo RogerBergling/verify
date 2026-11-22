@@ -9,6 +9,8 @@ services:
     ports:
       - "8080:8080"
     environment:
+      # First-visit theme: dark, light or system. A saved toggle choice wins.
+      APP_THEME: ${APP_THEME:-dark}
       AUTH_MODE: dev
       SECRET_KEY: ${SECRET_KEY:-dev-only-change-me-please-32-chars-minimum}
       COOKIE_SECURE: "0"
