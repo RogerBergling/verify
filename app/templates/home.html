@@ -47,11 +47,11 @@
           <label class="field">
             <span>{{ t("Personal number") }}</span>
             <select class="input" id="pn-mode" name="pn_mode">
-              <option value="full" selected>{{ t("Full number") }}</option>
-              <option value="masked">{{ t("Masked") }}</option>
+              <option value="masked" selected>{{ t("Masked") }}</option>
+              <option value="full">{{ t("Full number") }}</option>
             </select>
           </label>
-          <p class="safety-note">{{ t("Full personal numbers are sensitive. They are shown only inside this verification.") }}</p>
+          <p class="safety-note">{{ t("Full personal numbers are sensitive. You always see your own number. The other person sees it only if you explicitly choose Reveal.") }}</p>
         </div>
       </details>
     </form>

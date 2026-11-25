@@ -1,6 +1,12 @@
 # Verify
 
-**Status:** v0.2 implementation — working app, container, and GHCR pipeline.  
+**Project facts (2026-11-25):** version **0.2.0** · Python 3.11+ server-rendered app + SQLite · 18 unittest tests · MIT licensed.
+
+**Status:** v0.2 implementation — working app, container, and GHCR pipeline. The
+working tree contains post-v0.2.0 security hardening (masked PN default, proxy
+fail-closed, placeholder-secret rejection); rebuild and republish the image
+before relying on it.
+
 **Product name:** Verify. It is a common word and is **not trademark-cleared**; see [docs/naming.md](docs/naming.md).  
 **Design:** dark, clear interface inspired by [apps.bergling.net](https://apps.bergling.net), simplified for end users.
 
@@ -148,16 +154,14 @@ resolved before first paint, so there is no theme flash.
 
 The product decision is that the full personal number **must be displayable** during verification. The implementation treats that as a high-risk feature:
 
-- The session creator chooses **Full** or **Masked** detail.
-- Full mode displays the number in the session identity cards.
-- Masked mode shows `1990••••-••••`; a participant can explicitly share their own full number.
+- **Masked is the default.** The session creator can choose masked or full detail, but the choice never exposes another participant's number.
+- Each participant always sees their **own** number. Another participant's full number is shown only after that person explicitly chooses **Reveal**.
+- Masked mode shows `1990••••-••••` to the other participant. Full mode still requires the other person's explicit reveal.
 - The number is encrypted at rest with Fernet; the key is derived from `SECRET_KEY` or a separate `PN_ENCRYPTION_KEY`.
 - It is **never** written to receipts, logs, analytics, URLs, or QR codes.
 - The UI hides the number when the tab loses visibility; the user can show it again.
 - Receipts always use the masked form.
 - A privacy/DPIA review is still required before production.
-
-If you do not need full display, set the default to masked in `app/templates/home.html` and remove the full option; the backend supports both.
 
 ---
 
@@ -239,7 +243,8 @@ The suite covers:
 - configured public `BASE_URL` used for invitation links,
 - single-use join tokens and IDOR,
 - mismatch with no receipt,
-- masked-number reveal,
+- masked-number reveal and no disclosure in full mode without an explicit reveal,
+- `PROXY_SHARED_SECRET` required when `AUTH_MODE=proxy`, and known placeholder secrets rejected,
 - server-side expiry,
 - personal-number encryption at rest,
 - proxy-mode header authentication and shared-secret rejection.
@@ -301,6 +306,14 @@ The product name is now **Verify**. It is a common English/Swedish word, so trad
 - [Threat model](docs/threat-model.md)
 - [Naming](docs/naming.md)
 - [Deployment](docs/deployment.md)
+
+
+## AI assistance
+
+Developed with AI assistance and human review. The maintainer defines the
+requirements, threat model and acceptance criteria; AI helps write and refactor
+code; the maintainer runs, tests and verifies the result. The software is
+provided as-is, without warranty.
 
 ## License
 

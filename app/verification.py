@@ -389,7 +389,11 @@ def _build_view(
 
     participant_views = []
     for p in participants:
-        show_full = verification["pn_mode"] == "full" or bool(p["revealed_at"])
+        # A participant always sees their own number. Another participant's
+        # number is shown only after that person explicitly reveals it. The
+        # session creator's pn_mode choice must never disclose someone else's
+        # personal number without their consent.
+        show_full = p["user_id"] == user_id or bool(p["revealed_at"])
         pn = (
             security.decrypt_value(
                 config.secret_key, config.pn_encryption_key, p["pn_encrypted"]
@@ -422,7 +426,6 @@ def _build_view(
                 "confirmed_at": p["confirmed_at"],
                 "can_reveal": (
                     p["user_id"] == user_id
-                    and verification["pn_mode"] == "masked"
                     and not p["revealed_at"]
                     and bool(p["pn_encrypted"])
                 ),

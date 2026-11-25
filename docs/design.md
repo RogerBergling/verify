@@ -286,7 +286,7 @@ If the proxy is BankID/Freja-based but does not expose an assurance claim, the a
 - It authorizes every request against the BFF session and resource ownership.
 - It never trusts a `userId` from a request body or query string.
 - It never writes the full personal number to logs, analytics, URLs, QR codes, or receipts.
-- It may return the full personal number in the session view when the session’s `pn_mode` is `full`, or after a participant explicitly reveals their own number. The value is encrypted at rest and hidden when the tab loses visibility.
+- It returns a participant’s own full personal number in their session view. Another participant’s full number is returned only after that person explicitly reveals it. The value is encrypted at rest and hidden when the tab loses visibility.
 - It fails closed when the identity assertion is missing, malformed, duplicated, or expired.
 - It rate-limits session creation, joins, and confirmations.
 - It records an audit event for every state change.
@@ -447,7 +447,7 @@ Alice (browser)          BFF / app                   Bob (browser)
 - Do not auto-confirm on page load. Confirmation must be a deliberate action.
 - Keep the two directions distinct: “Your code” to read aloud, and an input for the other person’s code.
 - Provide a “This is not the person” / “Something is wrong” action at every step.
-- Do not show the full personal number. Show name and masked number, e.g. `1990••••-••••`.
+- Show name and masked number by default, e.g. `1990••••-••••`. A participant may reveal their own full number explicitly; never disclose someone else’s without that action.
 - Show the assurance label next to the name. Do not use a generic “Verified” badge without saying what was verified.
 - Anti-phishing copy must be visible, not buried in help.
 

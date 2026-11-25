@@ -80,16 +80,26 @@ class Config:
         if len(secret_key) < 32:
             raise SystemExit("SECRET_KEY must be at least 32 characters")
 
+        placeholder_secrets = {
+            "change-me-to-a-long-random-string-at-least-32-chars",
+            "dev-only-change-me-please-32-chars-minimum",
+        }
+        if auth_mode == "proxy" and secret_key in placeholder_secrets:
+            raise SystemExit(
+                "SECRET_KEY is a known placeholder. Generate a random value with: "
+                "python3 -c 'import secrets; print(secrets.token_urlsafe(48))'"
+            )
+
         pn_encryption_key = os.getenv("PN_ENCRYPTION_KEY", "").strip() or None
         if pn_encryption_key and len(pn_encryption_key) < 32:
             raise SystemExit("PN_ENCRYPTION_KEY must be at least 32 characters")
 
         proxy_shared_secret = os.getenv("PROXY_SHARED_SECRET", "").strip() or None
         if auth_mode == "proxy" and not proxy_shared_secret:
-            warnings.append(
-                "PROXY_SHARED_SECRET is not set. The app will trust X-User-Id and "
-                "related headers from any caller that can reach it. Network isolation "
-                "and proxy header stripping are mandatory."
+            raise SystemExit(
+                "PROXY_SHARED_SECRET is required when AUTH_MODE=proxy. "
+                "Without it the app would trust X-User-Id and related headers "
+                "from any caller that can reach it."
             )
 
         base_url = os.getenv("BASE_URL", "").strip().rstrip("/") or None

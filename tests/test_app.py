@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import http.cookiejar
 import json
+import os
 import re
 import sqlite3
 import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 from urllib.error import HTTPError
 from urllib.request import HTTPCookieProcessor, Request, build_opener
 
@@ -36,6 +38,35 @@ def make_config(
         github_url="https://github.com/RogerBergling/verify",
         allowed_origins=allowed_origins,
     )
+
+
+class ConfigValidationTests(unittest.TestCase):
+    def test_proxy_mode_requires_a_proxy_shared_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "AUTH_MODE": "proxy",
+                "SECRET_KEY": "x" * 64,
+                "BASE_URL": "https://verify.example.test",
+                "DATA_DIR": tmp,
+            }
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(SystemExit) as caught:
+                    Config.from_env()
+            self.assertIn("PROXY_SHARED_SECRET", str(caught.exception))
+
+    def test_proxy_mode_rejects_the_example_placeholder_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {
+                "AUTH_MODE": "proxy",
+                "SECRET_KEY": "change-me-to-a-long-random-string-at-least-32-chars",
+                "PROXY_SHARED_SECRET": "p" * 64,
+                "BASE_URL": "https://verify.example.test",
+                "DATA_DIR": tmp,
+            }
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(SystemExit) as caught:
+                    Config.from_env()
+            self.assertIn("placeholder", str(caught.exception))
 
 
 class Client:
@@ -123,7 +154,7 @@ class VerifyTests(unittest.TestCase):
         return Client(f"http://127.0.0.1:{server.server_address[1]}")
 
     def create_and_join(
-        self, *, pn_mode: str = "full", kind: str = "one_to_one"
+        self, *, pn_mode: str = "masked", kind: str = "one_to_one"
     ) -> tuple[Client, Client, str, str, dict, dict]:
         alice = self.client()
         alice.login("alice")
@@ -295,7 +326,8 @@ class VerifyTests(unittest.TestCase):
         self.assertEqual(view["state"], "ready")
         self.assertEqual(len(view["participants"]), 2)
         bob_view = next(p for p in view["participants"] if not p["is_me"])
-        self.assertEqual(bob_view["pn"], "19850202-5678")
+        self.assertIsNone(bob_view["pn"])
+        self.assertFalse(bob_view["pn_shared"])
         self.assertNotIn("code", view)
         self.assertNotIn("code", bob_view)
         self.assertNotIn("words", bob_view)
@@ -305,7 +337,8 @@ class VerifyTests(unittest.TestCase):
         status, _, bob_data = bob.get(f"/api/sessions/{session_id}")
         bob_session = json.loads(bob_data)["session"]
         alice_view = next(p for p in bob_session["participants"] if not p["is_me"])
-        self.assertEqual(alice_view["pn"], "19900101-1234")
+        self.assertIsNone(alice_view["pn"])
+        self.assertFalse(alice_view["pn_shared"])
 
         alice_code = created["view"]["my_code"]
         bob_code = joined["session"]["my_code"]
@@ -454,6 +487,24 @@ class VerifyTests(unittest.TestCase):
         )
         self.assertEqual(status, 200, final)
         self.assertEqual(final["session"]["state"], "verified")
+
+    def test_full_mode_does_not_disclose_the_other_persons_number(self) -> None:
+        alice, bob, session_id, token, created, joined = self.create_and_join(
+            pn_mode="full"
+        )
+        status, _, alice_data = alice.get(f"/api/sessions/{session_id}")
+        alice_view = json.loads(alice_data)["session"]
+        bob_view = next(p for p in alice_view["participants"] if not p["is_me"])
+        self.assertIsNone(bob_view["pn"])
+        self.assertFalse(bob_view["pn_shared"])
+
+        # Alice can still explicitly reveal her own number to Bob.
+        status, _, _ = alice.post_json(f"/api/sessions/{session_id}/reveal", {})
+        self.assertEqual(status, 200)
+        status, _, bob_data = bob.get(f"/api/sessions/{session_id}")
+        bob_session = json.loads(bob_data)["session"]
+        alice_from_bob = next(p for p in bob_session["participants"] if not p["is_me"])
+        self.assertEqual(alice_from_bob["pn"], "19900101-1234")
 
     def test_masked_reveal(self) -> None:
         alice, bob, session_id, token, created, joined = self.create_and_join(

@@ -415,7 +415,7 @@ def make_handler(config: Config) -> type[BaseHTTPRequestHandler]:
                 auth_ctx,
                 kind=str(body.get("kind", "one_to_one")),
                 context=str(body.get("context", "")),
-                pn_mode=str(body.get("pn_mode", "full")),
+                pn_mode=str(body.get("pn_mode", "masked")),
                 duration_minutes=int(body.get("duration_minutes", 10) or 10),
                 ip_hash=security.hash_ip(config.secret_key, self.client_address[0]),
                 ua_hash=security.hash_ua(config.secret_key, self.headers.get("User-Agent")),
