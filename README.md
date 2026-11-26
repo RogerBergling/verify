@@ -90,14 +90,14 @@ The app expects the reverse proxy / IdP to authenticate the user and inject:
 | `X-Person-Id` | No | Swedish personal number or comparable ID. Sensitive; stored encrypted. |
 | `X-Auth-Assurance` | No | `proxy`, `eid_auth`, or `eid_sign`. Defaults to `proxy`. |
 | `X-Auth-Org` | No | Organisation/company label for customer-service flows. |
-| `X-Proxy-Secret` | Production | Shared secret between proxy and app. Required by `compose.prod.yaml`; optional only for an mTLS-only deployment. |
+| `X-Proxy-Secret` | Yes | Shared secret between proxy and app. Required by the current code in `AUTH_MODE=proxy`, even when mTLS is used. Must match `PROXY_SHARED_SECRET`. |
 
 **The proxy must:**
 
 1. Authenticate every request.
 2. **Strip any client-supplied copies** of these headers.
 3. Inject them only after authentication.
-4. Protect the proxy-to-app leg with mTLS or the shared secret.
+4. Protect the proxy-to-app leg with mTLS and/or a private network; the app also requires the shared secret.
 5. Prevent direct access to the app port.
 6. Set `X-Auth-Assurance` honestly if the identity is eID-verified.
 
@@ -126,6 +126,101 @@ open the app on the same URL you configured in `BASE_URL`, or add the browser’
 origin to `ALLOWED_ORIGINS` (comma-separated). The request’s own host is accepted
 automatically, so this is usually a `localhost` vs `127.0.0.1`, port, or proxy
 hostname mismatch.
+
+### Production secrets
+
+`compose.prod.yaml` reads these values from `.env` (or the process environment):
+
+| Variable | Required | Purpose | Rotating it |
+|---|---|---|---|
+| `SECRET_KEY` | Yes | Internal app key for receipt HMACs, IP/UA hashing, join-token encryption, and personal-number encryption when no separate PN key is set. The proxy does not need it. | Existing receipts become unverifiable, and encrypted join tokens/personal numbers become unreadable. |
+| `PN_ENCRYPTION_KEY` | No, recommended | Separate key for personal-number encryption. If omitted, the key is derived from `SECRET_KEY`. | Existing encrypted personal numbers become unreadable. Set it before the first production start. |
+| `PROXY_SHARED_SECRET` | Yes | Shared secret sent by the proxy in `X-Proxy-Secret`. It proves the request came from the proxy, not from something else that can reach the app port. | Must be changed in the proxy and the app together. |
+
+Generate them with a CSPRNG:
+
+```bash
+python3 -c 'import secrets; print(secrets.token_urlsafe(48))'  # SECRET_KEY
+python3 -c 'import secrets; print(secrets.token_urlsafe(48))'  # PN_ENCRYPTION_KEY
+python3 -c 'import secrets; print(secrets.token_urlsafe(32))'  # PROXY_SHARED_SECRET
+```
+
+`SECRET_KEY` and `PROXY_SHARED_SECRET` must be different. Keep `.env` at mode `600`, owned by the deploy user, and never commit it. Compose interpolation also places these values in the container environment, where they are visible to anyone who can run `docker inspect`; protect the host or inject them from a secret manager at deploy time.
+
+`AUTH_MODE`, `COOKIE_SECURE`, `DATA_DIR`, and `PORT` are pinned in `compose.prod.yaml` (`proxy`, `1`, `/data`, `8080`). Setting them in `.env` does not override the Compose values.
+
+**Compose note:** `compose.prod.yaml` does not currently pass `ALLOWED_ORIGINS` into the container. If you use alias hostnames, add this under `environment:`:
+
+```yaml
+ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+```
+
+Otherwise the value in `.env` has no effect. A single public hostname is normally covered by `BASE_URL` and the request host.
+
+### Behind MobilityGuard OneGate
+
+Verify has no OneGate-specific integration. OneGate must authenticate the user, strip client-supplied identity headers, and inject the exact header names above. Publish Verify in OneGate as a web application with:
+
+- **Public URL:** `https://verify.example.se` — must match `BASE_URL`.
+- **Upstream:** the Verify container or host, e.g. `http://127.0.0.1:8080` if OneGate is on the same host, otherwise a private address.
+- **SSO method:** HTTP X-Headers.
+
+Map the authenticated user to the header contract:
+
+| Header | OneGate value |
+|---|---|
+| `X-User-Id` | Stable, opaque subject, e.g. `PARM{mguid}` or an objectGUID. Do not use the personal number or a changeable email address. |
+| `X-Name` | Given name, e.g. the attribute mapped to `givenName`. |
+| `X-Last-Name` | Surname, e.g. `sn`. |
+| `X-Person-Id` | Optional personal number, if OneGate has a trustworthy attribute. Verify encrypts it at rest. |
+| `X-Auth-Assurance` | `proxy` for normal SSO/MFA; `eid_auth` only if OneGate actually verified an eID; `eid_sign` only for signing. |
+| `X-Auth-Org` | Optional organisation label for customer-service flows. |
+| `X-Proxy-Secret` | The same value as `PROXY_SHARED_SECRET` in `.env`. |
+
+OneGate custom headers typically use `PARM{...}` values, for example:
+
+```text
+X-User-Id        PARM{mguid}
+X-Name           PARM{ldap1}
+X-Last-Name      PARM{ldap2}
+X-Person-Id      PARM{ldap3}
+X-Auth-Assurance proxy
+X-Auth-Org       PARM{ldap4}
+X-Proxy-Secret   <PROXY_SHARED_SECRET>
+```
+
+Adjust the `PARM{...}` names to your OneGate field mapping. The left-hand names must be exact. `X-Userid` is not `X-User-Id`.
+
+OneGate must also:
+
+1. Overwrite or remove any client-supplied copy of every identity header and `X-Proxy-Secret`.
+2. Send exactly one value per header; Verify rejects duplicates.
+3. Preserve the original path through login, especially `/join/<token>`.
+4. Terminate TLS and keep the OneGate-to-Verify leg on loopback or a private network.
+5. Not expose `/healthz` publicly.
+
+`compose.prod.yaml` binds the app to `127.0.0.1:8080`. If OneGate runs on another host, change the bind to a private address, for example `"10.0.0.10:8080:8080"`, or place both on the same private Docker network. Firewall the port so only OneGate can reach it; never publish `0.0.0.0:8080`.
+
+Smoke test from outside the proxy:
+
+```bash
+# Direct access must fail
+curl -i http://app-host:8080/
+
+# A forged identity header must not authenticate
+curl -i -H 'X-User-Id: victim' https://verify.example.se/api/me
+
+# A wrong shared secret must be rejected
+curl -i -H 'X-Proxy-Secret: wrong' http://app-host:8080/
+```
+
+`/api/me` must return the OneGate-authenticated subject, not `victim`. `/api/security-check` also reports the forged header and the active auth mode.
+
+### Why `X-Proxy-Secret` is required
+
+In proxy mode the app trusts `X-User-Id` and the other identity headers; it has no login of its own. If anything other than the proxy can reach the app port, it can forge those headers and impersonate any user. Network isolation is the primary control, but firewall and Docker network mistakes happen. The shared secret is a fail-closed second gate: a caller must both reach the app and know the secret.
+
+The secret authenticates only the proxy-to-app hop. It does not authenticate the end user, and it is a static bearer secret with no replay protection. Send it only over TLS, mTLS, loopback, or a private network. If it leaks, rotate it in OneGate and `.env` together.
 
 ---
 
@@ -186,7 +281,9 @@ For production:
 
 ```bash
 cp .env.example .env
+chmod 600 .env
 # edit .env, then:
+docker compose -f compose.prod.yaml pull
 docker compose -f compose.prod.yaml up -d
 ```
 
